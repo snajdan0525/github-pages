@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html >
+<head>
+  
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+  <meta charset="utf-8">
+  <meta name="baidu-site-verification" content="zzKGwrFJYw" />
+  
+  <title>Android跨进程通信机制Binder简要分析 | April is your lie</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="&amp;#160; &amp;#160; &amp;#160; &amp;#160; 在Android系统中，每个应用都是由四大组件中之几组成，我们经常要去写一些Activity或者Service，这些Activity或者Service有时候会运行在不同的进程中，如果我们要让这些不同的Activity或者Service之间通信，就要用到Android提供的Binder机制了。
+
+&amp;#160;&amp;#160;&amp;#160;&amp;#160">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Android跨进程通信机制Binder简要分析">
+<meta property="og:url" content="http://windrunnerlihuan.com/2016/06/12/Binder简要分析/index.html">
+<meta property="og:site_name" content="April is your lie">
+<meta property="og:description" content="&amp;#160; &amp;#160; &amp;#160; &amp;#160; 在Android系统中，每个应用都是由四大组件中之几组成，我们经常要去写一些Activity或者Service，这些Activity或者Service有时候会运行在不同的进程中，如果我们要让这些不同的Activity或者Service之间通信，就要用到Android提供的Binder机制了。
+
+&amp;#160;&amp;#160;&amp;#160;&amp;#160">
+<meta property="og:image" content="http://o7xxrho8u.bkt.clouddn.com/img/windrunnerlihuan%E5%8D%9A%E5%AE%A2/Android%E8%B7%A8%E8%BF%9B%E7%A8%8B%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6Binder%E7%AE%80%E8%A6%81%E5%88%86%E6%9E%90/meizi.jpg">
+<meta property="og:updated_time" content="2016-06-12T00:40:22.181Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Android跨进程通信机制Binder简要分析">
+<meta name="twitter:description" content="&amp;#160; &amp;#160; &amp;#160; &amp;#160; 在Android系统中，每个应用都是由四大组件中之几组成，我们经常要去写一些Activity或者Service，这些Activity或者Service有时候会运行在不同的进程中，如果我们要让这些不同的Activity或者Service之间通信，就要用到Android提供的Binder机制了。
+
+&amp;#160;&amp;#160;&amp;#160;&amp;#160">
+<meta name="twitter:image" content="http://o7xxrho8u.bkt.clouddn.com/img/windrunnerlihuan%E5%8D%9A%E5%AE%A2/Android%E8%B7%A8%E8%BF%9B%E7%A8%8B%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6Binder%E7%AE%80%E8%A6%81%E5%88%86%E6%9E%90/meizi.jpg">
+  
+    <link rel="alternative" href="/atom.xml" title="April is your lie" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/img/favicon.png">
+  
+  
+      <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+  
+  
+      <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+      <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+  <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  
+  
+      <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+  
+  <script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+  <script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+  <script>
+      var yiliaConfig = {
+          fancybox: true,
+          animate: true,
+          isHome: false,
+          isPost: true,
+          isArchive: false,
+          isTag: false,
+          isCategory: false,
+          open_in_new: false,
+          fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+          scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+          search: true
+      }
+  </script>
+
+  
+      <script>
+          yiliaConfig.jquery_ui = [true, "//cdn.bootcss.com/jqueryui/1.10.4/jquery-ui.min.js", "//cdn.bootcss.com/jqueryui/1.10.4/css/jquery-ui.min.css"];
+      </script>
+  
+
+  
+      <script>
+          yiliaConfig.rootUrl = "/";
+      </script>
+  
+
+  
+  
+  <!-- 自动推送工具代码 start -->
+  <script>
+(function(){
+    var bp = document.createElement('script');
+    var curProtocol = window.location.protocol.split(':')[0];
+    if (curProtocol === 'https') {
+        bp.src = 'https://zz.bdstatic.com/linksubmit/push.js';        
+    }
+    else {
+        bp.src = 'http://push.zhanzhang.baidu.com/push.js';
+    }
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(bp, s);
+})();
+</script>
+<!-- 自动推送工具代码 end -->
+</head>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.jpg" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">windrunnerlihuan</a></h1>
+        </hgroup>
+
+        
+        <p class="header-subtitle">四月是你的谎言</p>
+        
+
+        
+            <form id="search-form">
+            <input type="text" id="local-search-input" name="q" results="0" placeholder="search..." class="search form-control" autocomplete="off" autocorrect="off" searchonload="undefined" />
+            <i class="fa fa-times" onclick="resetSearch()"></i>
+            </form>
+            <div id="local-search-result"></div>
+            <p class='no-result'>No results found <i class='fa fa-spinner fa-pulse'></i></p>
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">时间轴</a></li>
+                        
+                            <li><a href="/tags/">标签云</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:937874128@qq.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="https://github.com/windrunnerlihuan" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Binder/">Binder</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Bitmap/">Bitmap</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IPC/">IPC</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SO库/">SO库</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/博客搭建/">博客搭建</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/属性动画/">属性动画</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/开始/">开始</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/弹幕/">弹幕</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/插件开发/">插件开发</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/智能指针/">智能指针</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/消息/">消息</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/移动直播/">移动直播</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://gank.io/">干货集中营</a>
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://www.jcodecraeer.com/">泡在网上的日子</a>
+                    
+                      <a target="_blank" class="main-nav-link switch-friends-link" href="http://trinea.cn/">Trinea</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">windrunnerlihuan，开发小菜一枚，坐标位于上海。</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">windrunnerlihuan</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.jpg" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">windrunnerlihuan</a></h1>
+            </hgroup>
+            
+            <p class="header-subtitle">四月是你的谎言</p>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">时间轴</a></li>
+                
+                    <li><a href="/tags/">标签云</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:937874128@qq.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="https://github.com/windrunnerlihuan" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我"/>
+</nav>
+      <div class="body-wrap"><article id="post-Binder简要分析" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2016/06/12/Binder简要分析/" class="article-date">
+      <time datetime="2016-06-11T16:24:24.000Z" itemprop="datePublished">2016-06-12</time>
+</a>
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      Android跨进程通信机制Binder简要分析
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Android技术点/">Android技术点</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Binder/">Binder</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/IPC/">IPC</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <hr>
+<p>&#160; &#160; &#160; &#160; 在Android系统中，每个应用都是由四大组件中之几组成，我们经常要去写一些Activity或者Service，这些Activity或者Service有时候会运行在不同的进程中，如果我们要让这些不同的Activity或者Service之间通信，就要用到Android提供的Binder机制了。</p>
+<blockquote>
+<p>&#160;&#160;&#160;&#160;Binder其实也不是Android提出来的一套新的进程间通信机制，它是基于<a href="http://www.angryredplanet.com/~hackbod/openbinder/docs/html/BinderIPCMechanism.html" target="_blank" rel="external">OpenBinder</a>来实现的。OpenBinder最先是由<a href="https://en.wikipedia.org/wiki/Be_Inc." target="_blank" rel="external">Be Inc.</a>开发的，接着<a href="https://en.wikipedia.org/wiki/Palm,_Inc." target="_blank" rel="external">Palm Inc.</a>也着使用。现在OpenBinder的作者<a href="http://www.angryredplanet.com/~hackbod/" target="_blank" rel="external">Dianne Hackborn</a>就是在Google工作，负责Android平台的开发工作。</p>
+</blockquote>
+<p>&#160; &#160; &#160; &#160; Android系统是基于Linux内核的，Linux已经拥有管道，system V IPC，socket等IPC手段，比如pipe管道（有血缘关系的进程），fifo有名管道（无血缘关系的进程），mmap/munmap内存共享映射，Unix Domain Socket等等。但是Android却采用了Binder这种不同上述几种类型的特有机制，至于原因肯定有很多，比如安全，实现方式合理性，内存优化，性能等等。（这一块儿坑的很多，需要积累很多linux系统相关内容，我也是恶补了许多知识。并且Binder远远不是三言两语能够概括清楚的，所以很多底层细节无法为大家展现，比如内核部分代码细节。既然不幸入坑了，我们就一步一步往下挖吧=。=）<br><a id="more"></a></p>
+<hr>
+<h1 id="Binder通信模型"><a href="#Binder通信模型" class="headerlink" title="Binder通信模型"></a>Binder通信模型</h1><h2 id="Binder的优势"><a href="#Binder的优势" class="headerlink" title="Binder的优势"></a>Binder的优势</h2><h3 id="实现方式"><a href="#实现方式" class="headerlink" title="实现方式"></a>实现方式</h3><p>&#160; &#160; &#160; &#160; Binder使用Client-Server通信方式：一个进程作为Server提供诸如视频/音频解码，视频捕获，地址本查询，网络连接等服务；多个进程作为Client向Server发起服务请求，获得所需要的服务。要想实现Client-Server通信据必须实现以下两点：一是server必须有确定的访问接入点或者说地址来接受Client的请求，并且Client可以通过某种途径获知Server的地址；二是制定Command-Reply协议来传输数据。例如在网络通信中Server的访问接入点就是Server主机的IP地址+端口号，传输协议为TCP协议。对Binder而言，Binder可以看成Server提供的实现某个特定服务的访问接入点， Client通过这个‘地址’向Server发送请求来使用该服务；对Client而言，Binder可以看成是通向Server的管道入口，要想和某个Server通信首先必须建立这个管道并获得管道入口。</p>
+<h3 id="性能优化"><a href="#性能优化" class="headerlink" title="性能优化"></a>性能优化</h3><p>&#160; &#160; &#160; &#160; 如果是传统的Linux IPC方式中，socket作为一款通用接口，其传输效率低，开销大，主要用在跨网络的进程间通信和本机上进程间的低速通信。消息队列和管道采用存储-转发方式，即数据先从发送方缓存区拷贝到内核开辟的缓存区中，然后再从内核缓存区拷贝到接收方缓存区，至少有两次拷贝过程。共享内存虽然无需拷贝，但控制复杂，难以使用。</p>
+<p>&#160; &#160; &#160; &#160; 举个例子如，Client要将一块内存数据传递给Server，一般的做法是，Client将这块数据从它的进程空间拷贝到内核空间中，然后内核再将这个数据从内核空间拷贝到Server的进程空间，这样，Server就可以访问这个数据了。但是在这种方法中，执行了两次内存拷贝操作。所以Binder设计时采用了折衷的方式，只需要把Client进程空间的数据拷贝一次到内核空间，然后Server与内核共享这个数据就可以了，整个过程只需要执行一次内存拷贝，提高了效率。同时这样更有C/S架构的模型，方便管理。</p>
+<h3 id="安全性"><a href="#安全性" class="headerlink" title="安全性"></a>安全性</h3><p>&#160; &#160; &#160; &#160; Android作为一个开放式，拥有众多开发者的的平台，应用程序的来源广泛，确保智能终端的安全是非常重要的。终端用户不希望从网上下载的程序在不知情的情况下偷窥隐私数据，连接无线网络，长期操作底层设备导致电池很快耗尽等等。传统IPC没有任何安全措施，完全依赖上层协议来确保。首先传统IPC的接收方无法获得对方进程可靠的UID/PID（用户ID/进程ID），从而无法鉴别对方身份。Android为每个安装好的应用程序分配了自己的UID，故进程的UID是鉴别进程身份的重要标志。使用传统IPC只能由用户在数据包里填入UID/PID，但这样不可靠，容易被恶意程序利用。可靠的身份标记只有由IPC机制本身在内核中添加。其次传统IPC访问接入点是开放的，无法建立私有通道。比如命名管道的名称，system V的键值，socket的ip地址或文件名都是开放的，只要知道这些接入点的程序都可以和对端建立连接，不管怎样都无法阻止恶意程序通过猜测接收方地址获得连接。</p>
+<p>&#160; &#160; &#160; &#160; 基于以上原因，Android需要建立一套新的IPC机制来满足系统对通信方式的安全性，这就是Binder。Binder为发送发添加UID/PID身份，既支持实名Binder也支持匿名Binder，安全性高。</p>
+<h2 id="通信方式和引用"><a href="#通信方式和引用" class="headerlink" title="通信方式和引用"></a>通信方式和引用</h2><p>&#160; &#160; &#160; &#160; 与其它IPC不同，Binder使用了面向对象的思想来描述作为访问接入点的Binder及其在Client中的入口：Binder是一个实体位于Server中的对象，该对象提供了一套方法用以实现对服务的请求，就象类的成员函数。遍布于client中的入口可以看成指向这个binder对象的‘指针’，一旦获得了这个‘指针’就可以调用该对象的方法访问server。在Client看来，通过Binder‘指针’调用其提供的方法和通过指针调用其它任何本地对象的方法并无区别，尽管前者的实体位于远端Server中，而后者实体位于本地内存中。‘指针’是C/C++的术语，换成java的说法是引用，即Client通过Binder的引用访问Server。如果借用Windows系统开发的一个术语‘句柄’也可以用来表述Binder在Client中的存在方式。从通信的角度看，Client中的Binder也可以看作是Server Binder的<code>‘代理’</code>，在本地代表远端Server为Client提供服务。本文中会使用‘引用’或‘句柄’这个两广泛使用的术语。</p>
+<blockquote>
+<p>&#160; &#160; &#160; &#160; 面向对象思想的引入将进程间通信转化为通过对某个Binder对象的引用调用该对象的方法，而其独特之处在于Binder对象是一个可以跨进程引用的对象，它的实体位于一个进程中，而它的引用却遍布于系统的各个进程之中。最诱人的是，这个引用和Java里引用一样既可以是强类型，也可以是弱类型，而且可以从一个进程传给其它进程，让大家都能访问同一Server，就象将一个对象或引用赋值给另一个引用一样。Binder模糊了进程边界，淡化了进程间通信过程，整个系统仿佛运行于同一个面向对象的程序之中。形形色色的Binder对象以及星罗棋布的引用仿佛粘接各个应用程序的胶水，这也是Binder在英文里的原意。</p>
+</blockquote>
+<p>&#160; &#160; &#160; &#160; 当然面向对象只是针对应用程序而言，对于Binder驱动和内核其它模块一样使用C语言实现，没有类和对象的概念。Binder驱动为面向对象的进程间通信提供底层支持。</p>
+<h2 id="Binder-通信模型"><a href="#Binder-通信模型" class="headerlink" title="Binder 通信模型"></a>Binder 通信模型</h2><p>&#160; &#160; &#160; &#160; 从英文字面上意思看，Binder具有粘结剂的意思，那么它把什么东西粘结在一起呢？在Android系统的Binder机制中，由一系统组件组成，分别是Client、Server、Service Manager和Binder驱动程序，其中Client、Server和Service Manager运行在用户空间，Binder驱动程序运行内核空间。Binder就是一种把这四个组件粘合在一起的粘结剂了，其中，核心组件便是Binder驱动程序了，Service Manager提供了辅助管理的功能，Client和Server正是在Binder驱动和Service Manager提供的基础设施上，进行Client-Server之间的通信。这四个角色的关系和互联网类似：Server是服务器，Client是客户终端，Service Manager是域名服务器（DNS），Binder驱动是路由器。</p>
+<h3 id="Binder驱动"><a href="#Binder驱动" class="headerlink" title="Binder驱动"></a>Binder驱动</h3><p>&#160; &#160; &#160; &#160; 和路由器一样，Binder驱动虽然默默无闻，却是通信的核心。尽管名叫‘驱动’，实际上和硬件设备没有任何关系，只是实现方式和设备驱动程序是一样的：它工作于内核态，提供open()，mmap()，poll()，ioctl()等标准文件操作，以字符驱动设备中的misc设备注册在设备目录/dev下，用户通过/dev/binder访问该它。驱动负责进程之间Binder通信的建立，Binder在进程之间的传递，Binder引用计数管理，数据包在进程之间的传递和交互等一系列底层支持。驱动和应用程序之间定义了一套接口协议，主要功能由ioctl()接口实现，不提供read()，write()接口，因为ioctl()灵活方便，且能够一次调用实现先写后读以满足同步交互，而不必分别调用write()和read()。Binder驱动的代码每个分支位置不一样，再加上我也没有下内核的代码，<a href="https://android.googlesource.com/kernel/common/+/android-4.4/drivers/android/binder.c" target="_blank" rel="external">这里</a>先给个4.4的<code>Binder.c</code>的地址,有兴趣的可以自己研究。</p>
+<h3 id="ServiceManager-与实名Binder"><a href="#ServiceManager-与实名Binder" class="headerlink" title="ServiceManager 与实名Binder"></a>ServiceManager 与实名Binder</h3><p>&#160; &#160; &#160; &#160; 和DNS类似，ServiceManager的作用是将字符形式的Binder名字转化成Client中对该Binder的引用，使得Client能够通过Binder名字获得对Server中Binder实体的引用。注册了名字的Binder叫实名Binder，就象每个网站除了有IP地址外还有自己的网址。Server创建了Binder实体，为其取一个字符形式，可读易记的名字，将这个Binder连同名字以数据包的形式通过Binder驱动发送给ServiceManager，通知ServiceManager注册一个名叫张三的Binder，它位于某个Server中。驱动为这个穿过进程边界的Binder创建位于内核中的实体节点以及ServiceManager对实体的引用，将名字及新建的引用打包传递给ServiceManager。ServiceManager收数据包后，从中取出名字和引用填入一张查找表中。</p>
+<p>&#160; &#160; &#160; &#160; 细心的读者可能会发现其中的蹊跷：ServiceManager是一个进程，Server是另一个进程，Server向ServiceManager注册Binder必然会涉及进程间通信。当前实现的是进程间通信却又要用到进程间通信，这就好象蛋可以孵出鸡前提却是要找只鸡来孵蛋。Binder的实现比较巧妙：预先创造一只鸡来孵蛋：ServiceManager和其它进程同样采用Binder通信，ServiceManager是Server端，有自己的Binder对象（实体），其它进程都是Client，需要通过这个Binder的引用来实现Binder的注册，查询和获取。ServiceManager提供的Binder比较特殊，它没有名字也不需要注册，当一个进程使用BINDER_SET_CONTEXT_MGR命令将自己注册成ServiceManager（会用到ioctl(fd, cmd, arg)函数，cmd为BINDER_SET_CONTEXT_MGR）时Binder驱动会自动为它创建Binder实体（这就是那只预先造好的鸡）。其次这个Binder的引用在所有Client中都固定为0而无须通过其它手段获得。也就是说，一个Server若要向ServiceManager注册自己Binder就必需通过0（即NULL指针）这个引用号和ServiceManager的Binder通信。类比网络通信，0号引用就好比域名服务器的地址，你必须预先手工或动态配置好。要注意这里说的Client是相对ServiceManager而言的，一个应用程序可能是个提供服务的Server，但对ServiceManager来说它仍然是个Client。</p>
+<h3 id="Client-获得实名Binder的引用"><a href="#Client-获得实名Binder的引用" class="headerlink" title="Client 获得实名Binder的引用"></a>Client 获得实名Binder的引用</h3><p>&#160; &#160; &#160; &#160; Server向ServiceManager注册了Binder实体及其名字后，Client就可以通过名字获得该Binder的引用了。Client也利用保留的0号引用向ServiceManager请求访问某个Binder：我申请获得名字叫张三的Binder的引用。ServiceManager收到这个连接请求，从请求数据包里获得Binder的名字，在查找表里找到该名字对应的条目，从条目中取出Binder的引用，将该引用作为回复发送给发起请求的Client。从面向对象的角度，这个Binder对象现在有了两个引用：一个位于ServiceManager中，一个位于发起请求的Client中。如果接下来有更多的Client请求该Binder，系统中就会有更多的引用指向该Binder，就象java里一个对象存在多个引用一样。而且类似的这些指向Binder的引用是强类型，从而确保只要有引用Binder实体就不会被释放掉。通过以上过程可以看出，ServiceManager象个火车票代售点，收集了所有火车的车票，可以通过它购买到乘坐各趟火车的票-得到某个Binder的引用。</p>
+<h3 id="匿名-Binder"><a href="#匿名-Binder" class="headerlink" title="匿名 Binder"></a>匿名 Binder</h3><p>&#160; &#160; &#160; &#160; 并不是所有Binder都需要注册给ServiceManager广而告之的。Server端可以通过已经建立的Binder连接将创建的Binder实体传给Client，当然这条已经建立的Binder连接必须是通过实名Binder实现。如果我们是从事application开发，跨进程的自己手写AIDL文件，或者相同进程的bindService自己添加一个继承Binder的子类，那么这个Binder没有向ServiceManager注册名字，所以是个匿名Binder。Client将会收到这个匿名Binder的引用，通过这个引用向位于Server中的实体发送请求。匿名Binder为通信双方建立一条私密通道，只要Server没有把匿名Binder发给别的进程，别的进程就无法通过穷举或猜测等任何方式获得该Binder的引用，向该Binder发送请求。</p>
+<hr>
+<p>好了，理论性的科普先到这里，再继续下去估计要扑（pu）街（gai）了 =。=，先来美图放松放松。<br><img src="http://o7xxrho8u.bkt.clouddn.com/img/windrunnerlihuan%E5%8D%9A%E5%AE%A2/Android%E8%B7%A8%E8%BF%9B%E7%A8%8B%E9%80%9A%E4%BF%A1%E6%9C%BA%E5%88%B6Binder%E7%AE%80%E8%A6%81%E5%88%86%E6%9E%90/meizi.jpg" alt="妹子图"></p>
+<h1 id="Binder机制跨进程原理"><a href="#Binder机制跨进程原理" class="headerlink" title="Binder机制跨进程原理"></a>Binder机制跨进程原理</h1><p>&#160; &#160; &#160; &#160; 上文给出了Binder的通信模型，指出了通信过程的四个角色: Client, Server, ServiceManager, driver; 但是我们仍然不清楚<code>Client到底是如何与Server完成通信的</code>,因为实现细节我们还没讲。</p>
+<p>&#160; &#160; &#160; &#160; 虽然Binder用到了面向对象的思想，但并不限制应用程序一定要使用面向对象的语言，无论是C语言还是C++语言都可以很容易的使用Binder来通信。例如尽管Android主要使用java/C++，象ServiceManager这么重要的进程就是用C语言实现的。</p>
+<p>&#160; &#160; &#160; &#160; Binder本质上只是一种底层通信方式，和具体服务没有关系。为了提供具体服务，Server必须提供一套接口函数以便Client通过远程访问使用各种服务。这时通常采用Proxy设计模式：将接口函数定义在一个抽象类中，Server和Client都会以该抽象类为基类实现所有接口函数，所不同的是Server端是真正的功能实现，而Client端是对这些函数远程调用请求的包装。如何将Binder和Proxy设计模式结合起来是应用程序实现面向对象Binder通信的根本问题。</p>
+<h2 id="Binder-在Server端的表述-–-Binder实体"><a href="#Binder-在Server端的表述-–-Binder实体" class="headerlink" title="Binder 在Server端的表述 – Binder实体"></a>Binder 在Server端的表述 – Binder实体</h2><p>&#160; &#160; &#160; &#160; 做为Proxy设计模式的基础，首先定义一个抽象接口类封装Server所有功能，其中包含一系列纯虚函数留待Server和Proxy各自实现（如果是java层则为接口方法，或者是AIDL文件，编译后大同小异）。由于这些函数需要跨进程调用，须为其一一编号，从而Server可以根据收到的编号决定调用哪个函数。其次就要引入Binder了。Server端定义另一个Binder抽象类处理来自Client的Binder请求数据包，其中最重要的成员是虚函数onTransact()。该函数分析收到的数据包，调用相应的接口函数处理请求。</p>
+<p>&#160; &#160; &#160; &#160; 接下来采用继承方式以接口类和Binder抽象类为基类构建Binder在Server中的实体，实现基类里所有的虚函数，包括公共接口函数以及数据包处理函数：onTransact()。这个函数的输入是来自Client的binder_transaction_data结构的数据包（java层为Parcel对象，对应native层还是这个结构体某一部分）。前面提到，该结构里有个成员code，包含这次请求的接口函数编号。onTransact()将case-by-case地解析code值，从数据包里取出函数参数，调用接口类中相应的，已经实现的公共接口函数。函数执行完毕，如果需要返回数据就再构建一个binder_transaction_data包将返回数据包填入其中。</p>
+<p>&#160; &#160; &#160; &#160; 那么各个Binder实体的onTransact()又是什么时候调用呢？这就需要驱动参与了。前面说过，Binder实体须要以Binde传输结构flat_binder_object形式发送给其它进程才能建立Binder通信，而Binder实体指针就存放在该结构的handle域中。驱动根据Binder位置数组从传输数据中获取该Binder的传输结构，为它创建位于内核中的Binder节点，将Binder实体指针记录在该节点中。如果接下来有其它进程向该Binder发送数据，驱动会根据节点中记录的信息将Binder实体指针填入binder_transaction_data的target.ptr中返回给接收线程。接收线程从数据包中取出该指针，reinterpret_cast成Binder抽象类并调用onTransact()函数。由于这是个虚函数，不同的Binder实体中有各自的实现，从而可以调用到不同Binder实体提供的onTransact()。</p>
+<h2 id="Binder-在Client端的表述-–-Binder引用"><a href="#Binder-在Client端的表述-–-Binder引用" class="headerlink" title="Binder 在Client端的表述 – Binder引用"></a>Binder 在Client端的表述 – Binder引用</h2><p>&#160; &#160; &#160; &#160; 做为Proxy设计模式的一部分，Client端的Binder同样要继承Server提供的公共接口类并实现公共函数。但这不是真正的实现，而是对远程函数调用的包装：将函数参数打包，通过Binder向Server发送申请并等待返回值。为此Client端的Binder还要知道Binder实体的相关信息，即对Binder实体的引用。该引用或是由ServiceManager转发过来的，对实名Binder的引用或是由另一个进程直接发送过来的，对匿名Binder的引用。</p>
+<p>&#160; &#160; &#160; &#160; 由于继承了同样的公共接口类，Client Binder提供了与Server Binder一样的函数原型，使用户感觉不出Server是运行在本地还是远端。Client Binder中，公共接口函数的包装方式是：创建一个binder_transaction_data数据包，将其对应的编码填入code域，将调用该函数所需的参数填入data.buffer指向的缓存中，并指明数据包的目的地，那就是已经获得的对Binder实体的引用，填入数据包的target.handle中。注意这里和Server的区别：实际上target域是个联合体，包括ptr和handle两个成员，前者用于接收数据包的Server，指向 Binder实体对应的内存空间；后者用于作为请求方的Client，存放Binder实体的引用，告知驱动数据包将路由给哪个实体。数据包准备好后，通过驱动接口发送出去。经过BC_TRANSACTION/BC_REPLY回合完成函数的远程调用并得到返回值。</p>
+<hr>
+<p>&#160; &#160; &#160; &#160; 以上主要是C++层实现步骤，java层也相同原理，只不过最终还会通过JNI调用C++层实现方法。<br>&#160; &#160; &#160; &#160; 我们举个栗子来描述会更通俗易懂一些：</p>
+<p>&#160; &#160; &#160; &#160; 假设Client进程想要调用Server进程的<code>object</code>对象的一个方法<code>add</code>;<br>&#160; &#160; &#160; &#160; 首先，Server进程要向ServiceManager注册；告诉自己是谁，自己有什么能力；在这个场景就是Server告诉ServiceManager，它叫<code>zhangsan</code>，它有一个<code>object</code>对象，可以执行<code>add</code> 操作；于是ServiceManager建立了一张表：<code>zhangsan</code>这个名字对应进程Server; </p>
+<p>&#160; &#160; &#160; &#160; 然后Client向ServiceManager查询：我需要联系一个名字叫做<code>zhangsan</code>的进程里面的<code>object</code>对象；这时候关键来了：进程之间通信的数据都会经过运行在内核空间里面的驱动，驱动在数据流过的时候做了一点手脚，它并不会给Client进程返回一个真正的<code>object</code>对象，而是返回一个看起来跟<code>object</code>一模一样的代理对象<code>objectProxy</code>，这个<code>objectProxy</code>也有一个<code>add</code>方法，但是这个<code>add</code>方法没有Server进程里面<code>object</code>对象的<code>add</code>方法那个能力；<code>objectProxy</code>的<code>add</code>只是一个傀儡，它唯一做的事情就是把参数包装然后交给驱动。(这里我们简化了ServiceManager的流程)</p>
+<p>&#160; &#160; &#160; &#160; 但是Client进程并不知道驱动返回给它的对象动过手脚，毕竟伪装的太像了，如假包换。Client开开心心地拿着<code>objectProxy</code>对象然后调用<code>add</code>方法；我们说过，这个<code>add</code>什么也不做，直接把参数做一些包装然后直接转发给Binder驱动。</p>
+<p>&#160; &#160; &#160; &#160; 驱动收到这个消息，发现是这个<code>objectProxy</code>；一查表就明白了：我之前用<code>objectProxy</code>替换了<code>object</code>发送给Client了，它真正应该要访问的是<code>object</code>对象的<code>add</code>方法；于是Binder驱动通知Server进程，调用你的<code>object</code>对象的<code>add</code>方法，然后把结果发给我，Sever进程收到这个消息，照做之后将结果返回驱动，驱动然后把结果返回给Client进程；于是整个过程就完成了。</p>
+<p>&#160; &#160; &#160; &#160; 由于驱动返回的<code>objectProxy</code>与Server进程里面原始的<code>object</code>是如此相似，给人感觉好像是<strong>直接把Server进程里面的对象<code>object</code>传递到了Client进程</strong> ；因此，我们可以说<strong>Binder对象是可以进行跨进程传递的对象</strong>。</p>
+<p>&#160; &#160; &#160; &#160; 但事实上我们知道，Binder跨进程传输并不是真的把一个对象传输到了另外一个进程；传输过程好像是Binder跨进程穿越的时候，它在一个进程留下了一个真身，在另外一个进程幻化出一个影子（这个影子可以很多个）；Client进程的操作其实是对于影子的操作，影子利用Binder驱动最终让真身完成操作。</p>
+<p>&#160; &#160; &#160; &#160; 理解这一点非常重要；务必仔细体会。另外，Android系统实现这种机制使用的是代理模式, 对于Binder的访问，如果是在同一个进程（不需要跨进程），那么直接返回原始的Binder实体；如果在不同进程，那么就给他一个代理对象（影子）；我们在系统源码以及AIDL的生成代码里面可以看到很多这种实现。</p>
+<p>&#160; &#160; &#160; &#160; 另外我们为了简化整个流程，隐藏了ServiceManager这一部分驱动进行的操作；实际上，由于ServiceManager与Server通常不在一个进程，Server进程向ServiceManager注册的过程也是跨进程通信，驱动也会对这个过程进行暗箱操作：ServiceManager中存在的Server端的对象实际上也是代理对象，后面Client向ServiceManager查询的时候，驱动会给Client返回另外一个代理对象。Sever进程的本地对象仅有一个，其他进程所拥有的全部都是它的代理。</p>
+<p>&#160; &#160; &#160; &#160; 一句话总结就是：<strong>Client进程只不过是持有了Server端的代理；代理对象协助驱动完成了跨进程通信</strong>。</p>
+<h1 id="分析Java层的Binder"><a href="#分析Java层的Binder" class="headerlink" title="分析Java层的Binder"></a>分析Java层的Binder</h1><p>&#160; &#160; &#160; &#160;  Android系统的很多服务都是由C++层的Binder实现，过程复杂先不说，主要是代码量巨多，分析起来篇幅远远不够，即使不分析完全，估计粘一半代码都快吐血了，所以就选了java层的Binder，会重点分析AIDL过程。</p>
+<p>&#160; &#160; &#160; &#160;  我们使用AIDL接口的时候，经常会接触到这些类：<strong>IBinder/IInterface/Binder/BinderProxy/Stub</strong>，相关功能如下：</p>
+<ul>
+<li>IBinder是一个接口，它代表了<strong>一种跨进程传输的能力</strong>；只要实现了这个接口，就能将这个对象进行跨进程传递；这是驱动底层支持的；在跨进程数据流经驱动的时候，驱动会识别IBinder类型的数据，从而自动完成不同进程Binder本地对象以及Binder代理对象的转换。</li>
+<li>IBinder负责数据传输，那么client与server端的调用契约（这里不用接口避免混淆）呢？这里的IInterface代表的就是远程server对象具有什么能力。具体来说，就是aidl里面的接口。</li>
+<li>Java层的Binder类，代表的其实就是<strong>Binder本地对象</strong>。BinderProxy类是Binder类的一个内部类，它代表远程进程的Binder对象的本地代理；这两个类都继承自IBinder, 因而都具有跨进程传输的能力；实际上，在跨越进程的时候，Binder驱动会自动完成这两个对象的转换。</li>
+<li>在使用AIDL的时候，编译工具会给我们生成一个Stub的静态内部类；这个类继承了Binder, 说明它是一个Binder本地对象，它实现了IInterface接口，表明它具有远程Server承诺给Client的能力；Stub是一个抽象类，具体的IInterface的相关实现需要我们手动完成，这里使用了策略模式。</li>
+</ul>
+<h2 id="AIDL过程分析"><a href="#AIDL过程分析" class="headerlink" title="AIDL过程分析"></a>AIDL过程分析</h2><p>&#160; &#160; &#160; &#160; 现在我们通过一个AIDL的使用，分析一下整个通信过程中，各个角色到底做了什么，AIDL到底是如何完成通信的。<br>&#160; &#160; &#160; &#160; 首先定一个一个简单的aidl接口：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//ITest.aidl</span></span><br><span class="line"><span class="keyword">package</span> com.windrunnerlihuan;</span><br><span class="line"><span class="class"><span class="keyword">interface</span> <span class="title">ITest</span></span>&#123;</span><br><span class="line">	<span class="function"><span class="keyword">int</span> <span class="title">add</span><span class="params">(<span class="keyword">int</span> a, <span class="keyword">int</span> b)</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>然后用编译工具编译之后，可以得到对应的ITest.java类：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">package</span> com.windrunnerlihuan;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">ITest</span> <span class="keyword">extends</span> <span class="title">android</span>.<span class="title">os</span>.<span class="title">IInterface</span> </span>&#123;</span><br><span class="line">	<span class="comment">/** Local-side IPC implementation stub class. */</span></span><br><span class="line">	<span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">Stub</span> <span class="keyword">extends</span> <span class="title">android</span>.<span class="title">os</span>.<span class="title">Binder</span> <span class="keyword">implements</span></span><br><span class="line">			<span class="title">com</span>.<span class="title">windrunnerlihuan</span>.<span class="title">ITest</span> </span>&#123;</span><br><span class="line">		<span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> java.lang.String DESCRIPTOR = <span class="string">"com.windrunnerlihuan.ITest"</span>;</span><br><span class="line"></span><br><span class="line">		<span class="comment">/** Construct the stub at attach it to the interface. */</span></span><br><span class="line">		<span class="function"><span class="keyword">public</span> <span class="title">Stub</span><span class="params">()</span> </span>&#123;</span><br><span class="line">			<span class="keyword">this</span>.attachInterface(<span class="keyword">this</span>, DESCRIPTOR);</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="comment">/**</span><br><span class="line">		 * Cast an IBinder object into an com.windrunnerlihuan.ITest interface,</span><br><span class="line">		 * generating a proxy if needed.</span><br><span class="line">		 */</span></span><br><span class="line">		<span class="keyword">public</span> <span class="keyword">static</span> com.windrunnerlihuan.<span class="function">ITest <span class="title">asInterface</span><span class="params">(</span><br><span class="line">				android.os.IBinder obj)</span> </span>&#123;</span><br><span class="line">			<span class="keyword">if</span> ((obj == <span class="keyword">null</span>)) &#123;</span><br><span class="line">				<span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">			&#125;</span><br><span class="line">			android.os.IInterface iin = obj.queryLocalInterface(DESCRIPTOR);</span><br><span class="line">			<span class="keyword">if</span> (((iin != <span class="keyword">null</span>) &amp;&amp; (iin <span class="keyword">instanceof</span> com.windrunnerlihuan.ITest))) &#123;</span><br><span class="line">				<span class="keyword">return</span> ((com.windrunnerlihuan.ITest) iin);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">return</span> <span class="keyword">new</span> com.windrunnerlihuan.ITest.Stub.Proxy(obj);</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="meta">@Override</span></span><br><span class="line">		<span class="keyword">public</span> android.os.<span class="function">IBinder <span class="title">asBinder</span><span class="params">()</span> </span>&#123;</span><br><span class="line">			<span class="keyword">return</span> <span class="keyword">this</span>;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="meta">@Override</span></span><br><span class="line">		<span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">onTransact</span><span class="params">(<span class="keyword">int</span> code, android.os.Parcel data,</span><br><span class="line">				android.os.Parcel reply, <span class="keyword">int</span> flags)</span></span><br><span class="line">				<span class="keyword">throws</span> android.os.RemoteException </span>&#123;</span><br><span class="line">			<span class="keyword">switch</span> (code) &#123;</span><br><span class="line">			<span class="keyword">case</span> INTERFACE_TRANSACTION: &#123;</span><br><span class="line">				reply.writeString(DESCRIPTOR);</span><br><span class="line">				<span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">case</span> TRANSACTION_add: &#123;</span><br><span class="line">				data.enforceInterface(DESCRIPTOR);</span><br><span class="line">				<span class="keyword">int</span> _arg0;</span><br><span class="line">				_arg0 = data.readInt();</span><br><span class="line">				<span class="keyword">int</span> _arg1;</span><br><span class="line">				_arg1 = data.readInt();</span><br><span class="line">				<span class="keyword">int</span> _result = <span class="keyword">this</span>.add(_arg0, _arg1);</span><br><span class="line">				reply.writeNoException();</span><br><span class="line">				reply.writeInt(_result);</span><br><span class="line">				<span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">			&#125;</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">return</span> <span class="keyword">super</span>.onTransact(code, data, reply, flags);</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="keyword">private</span> <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">Proxy</span> <span class="keyword">implements</span> <span class="title">com</span>.<span class="title">windrunnerlihuan</span>.<span class="title">ITest</span> </span>&#123;</span><br><span class="line">			<span class="keyword">private</span> android.os.IBinder mRemote;</span><br><span class="line"></span><br><span class="line">			Proxy(android.os.IBinder remote) &#123;</span><br><span class="line">				mRemote = remote;</span><br><span class="line">			&#125;</span><br><span class="line"></span><br><span class="line">			<span class="meta">@Override</span></span><br><span class="line">			<span class="keyword">public</span> android.os.<span class="function">IBinder <span class="title">asBinder</span><span class="params">()</span> </span>&#123;</span><br><span class="line">				<span class="keyword">return</span> mRemote;</span><br><span class="line">			&#125;</span><br><span class="line"></span><br><span class="line">			<span class="keyword">public</span> java.lang.<span class="function">String <span class="title">getInterfaceDescriptor</span><span class="params">()</span> </span>&#123;</span><br><span class="line">				<span class="keyword">return</span> DESCRIPTOR;</span><br><span class="line">			&#125;</span><br><span class="line"></span><br><span class="line">			<span class="meta">@Override</span></span><br><span class="line">			<span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">add</span><span class="params">(<span class="keyword">int</span> a, <span class="keyword">int</span> b)</span> <span class="keyword">throws</span> android.os.RemoteException </span>&#123;</span><br><span class="line">				android.os.Parcel _data = android.os.Parcel.obtain();</span><br><span class="line">				android.os.Parcel _reply = android.os.Parcel.obtain();</span><br><span class="line">				<span class="keyword">int</span> _result;</span><br><span class="line">				<span class="keyword">try</span> &#123;</span><br><span class="line">					_data.writeInterfaceToken(DESCRIPTOR);</span><br><span class="line">					_data.writeInt(a);</span><br><span class="line">					_data.writeInt(b);</span><br><span class="line">					mRemote.transact(Stub.TRANSACTION_add, _data, _reply, <span class="number">0</span>);</span><br><span class="line">					_reply.readException();</span><br><span class="line">					_result = _reply.readInt();</span><br><span class="line">				&#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">					_reply.recycle();</span><br><span class="line">					_data.recycle();</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">return</span> _result;</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> TRANSACTION_add = (android.os.IBinder.FIRST_CALL_TRANSACTION + <span class="number">0</span>);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">add</span><span class="params">(<span class="keyword">int</span> a, <span class="keyword">int</span> b)</span> <span class="keyword">throws</span> android.os.RemoteException</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>&#160; &#160; &#160; &#160; 系统帮我们生成了这个文件之后，我们只需要继承ITest.Stub这个抽象类，实现它的方法，然后在Service 的onBind方法里面返回就实现了AIDL。这个Stub类非常重要，具体看看它做了什么。</p>
+<p>&#160; &#160; &#160; &#160; Stub类继承自Binder，意味着这个Stub其实自己是一个Binder本地对象，然后实现了ITest接口，ITest本身是一个IInterface，因此他携带某种客户端需要的能力（这里是方法<code>add</code>)。此类有一个内部类Proxy，也就是Binder代理对象；</p>
+<p>&#160; &#160; &#160; &#160; 然后看看<code>asInterface</code>方法，我们在bind一个Service之后，在onServiceConnecttion的回调里面，就是通过这个方法拿到一个远程的service的，这个方法做了什么呢？<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span><br><span class="line"> * Cast an IBinder object into an com.windrunnerlihuan.ITest interface,</span><br><span class="line"> * generating a proxy if needed.</span><br><span class="line"> */</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> com.windrunnerlihuan.<span class="function">ITest <span class="title">asInterface</span><span class="params">(</span><br><span class="line">		android.os.IBinder obj)</span> </span>&#123;</span><br><span class="line">	<span class="keyword">if</span> ((obj == <span class="keyword">null</span>)) &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">	&#125;</span><br><span class="line">	android.os.IInterface iin = obj.queryLocalInterface(DESCRIPTOR);</span><br><span class="line">	<span class="keyword">if</span> (((iin != <span class="keyword">null</span>) &amp;&amp; (iin <span class="keyword">instanceof</span> com.windrunnerlihuan.ITest))) &#123;</span><br><span class="line">		<span class="keyword">return</span> ((com.windrunnerlihuan.ITest) iin);</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="keyword">new</span> com.windrunnerlihuan.ITest.Stub.Proxy(obj);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>&#160; &#160; &#160; &#160; 首先看函数的参数<code>IBinder</code>类型的obj，这个对象是驱动给我们的，如果是Binder本地对象，那么它就是Binder类型，如果是Binder代理对象，那就是<code>BinderProxy</code>类型；然后，正如上面自动生成的文档所说，它会试着查找Binder本地对象，如果找到，说明Client和Server都在同一个进程，这个参数直接就是本地对象，直接强制类型转换然后返回，如果找不到，说明是远程对象（处于另外一个进程）那么就需要创建一个Binde代理对象，让这个Binder代理实现对于远程对象的访问。一般来说，如果是与一个远程Service对象进行通信，那么这里返回的一定是一个Binder代理对象，这个IBinder参数的实际上是BinderProxy;</p>
+<p>&#160; &#160; &#160; &#160; 再看看我们对于aidl的<code>add</code> 方法的实现；在<code>Stub</code>类里面，add是一个抽象方法，我们需要继承这个类并实现它；如果Client和Server在同一个进程，那么直接就是调用这个方法；那么，如果是远程调用，这中间发生了什么呢？Client是如何调用到Server的方法的？</p>
+<p>&#160; &#160; &#160; &#160; 我们知道，对于远程方法的调用，是通过Binder代理完成的，在这个例子里面就是<code>Proxy</code>类；<code>Proxy</code>对于<code>add</code>方法的实现如下：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">int</span> <span class="title">add</span><span class="params">(<span class="keyword">int</span> a, <span class="keyword">int</span> b)</span> <span class="keyword">throws</span> android.os.RemoteException </span>&#123;</span><br><span class="line">	android.os.Parcel _data = android.os.Parcel.obtain();</span><br><span class="line">	android.os.Parcel _reply = android.os.Parcel.obtain();</span><br><span class="line">	<span class="keyword">int</span> _result;</span><br><span class="line">	<span class="keyword">try</span> &#123;</span><br><span class="line">		_data.writeInterfaceToken(DESCRIPTOR);</span><br><span class="line">		_data.writeInt(a);</span><br><span class="line">		_data.writeInt(b);</span><br><span class="line">		mRemote.transact(Stub.TRANSACTION_add, _data, _reply, <span class="number">0</span>);</span><br><span class="line">		_reply.readException();</span><br><span class="line">		_result = _reply.readInt();</span><br><span class="line">	&#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">		_reply.recycle();</span><br><span class="line">		_data.recycle();</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> _result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>&#160; &#160; &#160; &#160; 它首先用<code>Parcel</code>把数据序列化了，然后调用了<code>transact</code>方法；这个<code>transact</code>到底做了什么呢？这个<code>Proxy</code>类在<code>asInterface</code>方法里面被创建，前面提到过，如果是Binder代理那么说明驱动返回的IBinder实际是<code>BinderProxy</code>, 因此我们的<code>Proxy</code>类里面的<code>mRemote</code>实际类型应该是<code>BinderProxy</code>；我们看看<code>BinderProxy</code>的<code>transact</code>方法：(Binder.java的内部类)<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">transact</span><span class="params">(<span class="keyword">int</span> code, Parcel data, Parcel reply, <span class="keyword">int</span> flags)</span> <span class="keyword">throws</span> RemoteException </span>&#123;</span><br><span class="line">        Binder.checkParcel(<span class="keyword">this</span>, code, data, <span class="string">"Unreasonably large binder buffer"</span>);</span><br><span class="line">        <span class="keyword">return</span> transactNative(code, data, reply, flags);</span><br><span class="line">&#125;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">native</span> <span class="keyword">boolean</span> <span class="title">transactNative</span><span class="params">(<span class="keyword">int</span> code, Parcel data, Parcel reply,</span><br><span class="line">            <span class="keyword">int</span> flags)</span> <span class="keyword">throws</span> RemoteException</span>;</span><br></pre></td></tr></table></figure></p>
+<p>这是一个本地方法；它的实现在native层，具体来说在frameworks/base/core/jni/android_util_Binder.cpp文件:<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> jboolean <span class="title">android_os_BinderProxy_transact</span><span class="params">(JNIEnv* env, jobject obj,</span><br><span class="line">        jint code, jobject dataObj, jobject replyObj, jint flags)</span> <span class="comment">// throws RemoteException</span></span><br><span class="line"></span>&#123;</span><br><span class="line">	<span class="comment">//这段不用看</span></span><br><span class="line">    <span class="keyword">if</span> (dataObj == <span class="literal">NULL</span>) &#123;</span><br><span class="line">        jniThrowNullPointerException(env, <span class="literal">NULL</span>);</span><br><span class="line">        <span class="keyword">return</span> JNI_FALSE;</span><br><span class="line">    &#125;</span><br><span class="line">	<span class="comment">//把java对象解析为C++对象</span></span><br><span class="line">    Parcel* data = parcelForJavaObject(env, dataObj);</span><br><span class="line">    <span class="keyword">if</span> (data == <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> JNI_FALSE;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//把java对象解析为C++对象</span></span><br><span class="line">    Parcel* reply = parcelForJavaObject(env, replyObj);</span><br><span class="line">    <span class="keyword">if</span> (reply == <span class="literal">NULL</span> &amp;&amp; replyObj != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> JNI_FALSE;</span><br><span class="line">    &#125;</span><br><span class="line">	<span class="comment">/*这部分得说明一下，这是个坑，有兴趣的可以挖：在获取Service Manager远程接口时，在JNI层中，创建了一个BpBinder对象，它的句柄值为0，它的地址保存在gBinderProxyOffsets.mObject中，因此，这里通过下面语句得到这个BpBinder对象的IBinder接口：*/</span></span><br><span class="line">    IBinder* target = (IBinder*)</span><br><span class="line">        env-&gt;GetLongField(obj, gBinderProxyOffsets.mObject);</span><br><span class="line">    <span class="keyword">if</span> (target == <span class="literal">NULL</span>) &#123;</span><br><span class="line">        jniThrowException(env, <span class="string">"java/lang/IllegalStateException"</span>, <span class="string">"Binder has been finalized!"</span>);</span><br><span class="line">        <span class="keyword">return</span> JNI_FALSE;</span><br><span class="line">    &#125;</span><br><span class="line">	<span class="comment">//打印LOG，忽略</span></span><br><span class="line">    ALOGV(<span class="string">"Java code calling transact on %p in Java object %p with code %"</span> PRId32 <span class="string">"\n"</span>,</span><br><span class="line">            target, obj, code);</span><br><span class="line"><span class="comment">//干扰视线的宏，忽略</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">if</span> ENABLE_BINDER_SAMPLE</span></span><br><span class="line">    <span class="comment">// Only log the binder call duration for things on the Java-level main thread.</span></span><br><span class="line">    <span class="comment">// But if we don't</span></span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">bool</span> time_binder_calls = should_time_binder_calls();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int64_t</span> start_millis;</span><br><span class="line">    <span class="keyword">if</span> (time_binder_calls) &#123;</span><br><span class="line">        start_millis = uptimeMillis();</span><br><span class="line">    &#125;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	<span class="comment">//这段才是重点</span></span><br><span class="line">    <span class="comment">//printf("Transact from Java code to %p sending: ", target); data-&gt;print();</span></span><br><span class="line">    <span class="keyword">status_t</span> err = target-&gt;transact(code, *data, reply, flags);</span><br><span class="line">    <span class="comment">//if (reply) printf("Transact from Java code to %p received: ", target); reply-&gt;print();</span></span><br><span class="line"><span class="comment">//下面都可以忽略了    </span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">if</span> ENABLE_BINDER_SAMPLE</span></span><br><span class="line">    <span class="keyword">if</span> (time_binder_calls) &#123;</span><br><span class="line">        conditionally_log_binder_call(start_millis, target, code);</span><br><span class="line">    &#125;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (err == NO_ERROR) &#123;</span><br><span class="line">        <span class="keyword">return</span> JNI_TRUE;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (err == UNKNOWN_TRANSACTION) &#123;</span><br><span class="line">        <span class="keyword">return</span> JNI_FALSE;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    signalExceptionForError(env, obj, err, <span class="literal">true</span> <span class="comment">/*canThrowRemoteException*/</span>);</span><br><span class="line">    <span class="keyword">return</span> JNI_FALSE;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>&#160; &#160; &#160; &#160; 我在注释中说这儿有个坑，有兴趣的就去挖吧，就是在获取Service Manager远程接口时，在JNI层中，创建了一个<code>BpBinder</code>对象，它的句柄值为0，它的地址保存在<code>gBinderProxyOffsets.mObject</code>中，因此，还得去找<code>BpBinder</code>的<code>transact</code>方法，<code>BpBinder</code>的位置在framework\native\libs\binder\BpBinder.cpp:<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">status_t</span> BpBinder::transact(</span><br><span class="line">    <span class="keyword">uint32_t</span> code, <span class="keyword">const</span> Parcel&amp; data, Parcel* reply, <span class="keyword">uint32_t</span> flags)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">// Once a binder has died, it will never come back to life.</span></span><br><span class="line">    <span class="keyword">if</span> (mAlive) &#123;</span><br><span class="line">	    <span class="comment">//唉，又是个坑，继续挖IPCThreadState</span></span><br><span class="line">        <span class="keyword">status_t</span> status = IPCThreadState::self()-&gt;transact(</span><br><span class="line">            mHandle, code, data, reply, flags);</span><br><span class="line">        <span class="keyword">if</span> (status == DEAD_OBJECT) mAlive = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">return</span> status;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> DEAD_OBJECT;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>&#160; &#160; &#160; &#160; 继续挖IPCThreadState，位于framework\native\libs\binder\IPCThreadState.cpp(这个self函数就不贴了，就是个单例写法):<br><figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">status_t</span> IPCThreadState::transact(<span class="keyword">int32_t</span> handle,</span><br><span class="line">                                  <span class="keyword">uint32_t</span> code, <span class="keyword">const</span> Parcel&amp; data,</span><br><span class="line">                                  Parcel* reply, <span class="keyword">uint32_t</span> flags)</span><br><span class="line"></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">status_t</span> err = data.errorCheck();</span><br><span class="line"> </span><br><span class="line">    flags |= TF_ACCEPT_FDS;    </span><br><span class="line">    <span class="keyword">if</span> (err == NO_ERROR) &#123;</span><br><span class="line">        <span class="comment">//调用writeTransactionData 发送数据</span></span><br><span class="line">		err = writeTransactionData(BC_TRANSACTION, flags, handle, code, data, <span class="literal">NULL</span>);</span><br><span class="line">    &#125; </span><br><span class="line">      <span class="keyword">if</span> ((flags &amp; TF_ONE_WAY) == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (reply) &#123;</span><br><span class="line">            err = waitForResponse(reply);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            Parcel fakeReply;</span><br><span class="line">            err = waitForResponse(&amp;fakeReply);</span><br><span class="line">        &#125;</span><br><span class="line">      ....等回复</span><br><span class="line"></span><br><span class="line">        err = waitForResponse(<span class="literal">NULL</span>, <span class="literal">NULL</span>);</span><br><span class="line"></span><br><span class="line">   ....    </span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> err;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">再进一步，瞧瞧这个...</span><br><span class="line"></span><br><span class="line"><span class="keyword">status_t</span> IPCThreadState::writeTransactionData(<span class="keyword">int32_t</span> cmd, <span class="keyword">uint32_t</span> binderFlags,</span><br><span class="line">    <span class="keyword">int32_t</span> handle, <span class="keyword">uint32_t</span> code, <span class="keyword">const</span> Parcel&amp; data, <span class="keyword">status_t</span>* statusBuffer)</span><br><span class="line">&#123;</span><br><span class="line">    binder_transaction_data tr;</span><br><span class="line">    tr.target.handle = handle;</span><br><span class="line">    tr.code = code;</span><br><span class="line">    tr.flags = binderFlags;    </span><br><span class="line">    <span class="keyword">const</span> <span class="keyword">status_t</span> err = data.errorCheck();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (err == NO_ERROR) &#123;</span><br><span class="line">        tr.data_size = data.ipcDataSize();</span><br><span class="line">        tr.data.ptr.buffer = data.ipcData();</span><br><span class="line">        tr.offsets_size = data.ipcObjectsCount()*<span class="keyword">sizeof</span>(<span class="keyword">size_t</span>);</span><br><span class="line">        tr.data.ptr.offsets = data.ipcObjects();</span><br><span class="line">    &#125; </span><br><span class="line">....</span><br><span class="line"></span><br><span class="line"><span class="comment">//上面把命令数据封装成binder_transaction_data，然后写到mOut中，mOut是命令的缓冲区，也是一个Parcel</span></span><br><span class="line">    mOut.writeInt32(cmd);</span><br><span class="line">    mOut.write(&amp;tr, <span class="keyword">sizeof</span>(tr));</span><br><span class="line"><span class="comment">//仅仅写到了Parcel中，Parcel好像没和/dev/binder设备有什么关联啊？</span></span><br><span class="line"><span class="comment">//恩，那只能在另外一个地方写到binder设备中去了。难道是在？</span></span><br><span class="line">    <span class="keyword">return</span> NO_ERROR;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//说对了，就是在waitForResponse中</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">status_t</span> IPCThreadState::waitForResponse(Parcel *reply, <span class="keyword">status_t</span> *acquireResult)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">int32_t</span> cmd;</span><br><span class="line">    <span class="keyword">int32_t</span> err;</span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line"><span class="comment">//talkWithDriver，哈哈，应该是这里了</span></span><br><span class="line">        <span class="keyword">if</span> ((err=talkWithDriver()) &lt; NO_ERROR) <span class="keyword">break</span>;</span><br><span class="line">        err = mIn.errorCheck();</span><br><span class="line">        <span class="keyword">if</span> (err &lt; NO_ERROR) <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">if</span> (mIn.dataAvail() == <span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line">        <span class="comment">//看见没？这里开始操作mIn了，看来talkWithDriver中</span></span><br><span class="line"><span class="comment">//把mOut发出去，然后从driver中读到数据放到mIn中了。</span></span><br><span class="line">        cmd = mIn.readInt32(); </span><br><span class="line">        <span class="keyword">switch</span> (cmd) &#123;</span><br><span class="line">        <span class="keyword">case</span> BR_TRANSACTION_COMPLETE:</span><br><span class="line">            <span class="keyword">if</span> (!reply &amp;&amp; !acquireResult) <span class="keyword">goto</span> finish;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">   .....</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> err;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">status_t</span> IPCThreadState::talkWithDriver(<span class="keyword">bool</span> doReceive)</span><br><span class="line">&#123;</span><br><span class="line">binder_write_read bwr;</span><br><span class="line">   <span class="comment">//中间东西太复杂了，不就是把mOut数据和mIn接收数据的处理后赋值给bwr吗？</span></span><br><span class="line">    <span class="keyword">status_t</span> err;</span><br><span class="line">    <span class="keyword">do</span> &#123;</span><br><span class="line"><span class="comment">//用ioctl来读写</span></span><br><span class="line">        <span class="keyword">if</span> (ioctl(mProcess-&gt;mDriverFD, BINDER_WRITE_READ, &amp;bwr) &gt;= <span class="number">0</span>)</span><br><span class="line">            err = NO_ERROR;</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            err = -errno;</span><br><span class="line">  &#125; <span class="keyword">while</span> (err == -EINTR);</span><br><span class="line"><span class="comment">//到这里，回复数据就在bwr中了，bmr接收回复数据的buffer就是mIn提供的</span></span><br><span class="line">        <span class="keyword">if</span> (bwr.read_consumed &gt; <span class="number">0</span>) &#123;</span><br><span class="line">            mIn.setDataSize(bwr.read_consumed);</span><br><span class="line">            mIn.setDataPosition(<span class="number">0</span>);</span><br><span class="line">        &#125;</span><br><span class="line"><span class="keyword">return</span> NO_ERROR;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>&#160; &#160; &#160; &#160; 里面进行了一系列的函数调用，确实是个巨恶心的过程；要知道的是它最终调用到了talkWithDriver函数；看这个函数的名字就知道，通信过程要交给驱动完成了（驱动调用是个更恶心的过程，感觉真不是人看的。。。。。）；<br>&#160; &#160; &#160; &#160; （以下过程限于篇幅和巨恶心的过程，所以简要概括，有兴趣的可以自己去挖坑=。=）<br>&#160; &#160; &#160; &#160; 这个函数最后通过ioctl系统调用，Client进程陷入内核态，Client调用add方法的线程挂起等待返回；驱动完成一系列的操作之后唤醒Server进程，调用了Server进程本地对象的onTransact函数（实际上由Server端线程池完成）。我们再看Binder本地对象的onTransact方法（这里就是Stub类里面的此方法）：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">onTransact</span><span class="params">(<span class="keyword">int</span> code, android.os.Parcel data,</span><br><span class="line">		android.os.Parcel reply, <span class="keyword">int</span> flags)</span></span><br><span class="line">		<span class="keyword">throws</span> android.os.RemoteException </span>&#123;</span><br><span class="line">	<span class="keyword">switch</span> (code) &#123;</span><br><span class="line">	<span class="keyword">case</span> INTERFACE_TRANSACTION: &#123;</span><br><span class="line">		reply.writeString(DESCRIPTOR);</span><br><span class="line">		<span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">case</span> TRANSACTION_add: &#123;</span><br><span class="line">		data.enforceInterface(DESCRIPTOR);</span><br><span class="line">		<span class="keyword">int</span> _arg0;</span><br><span class="line">		_arg0 = data.readInt();</span><br><span class="line">		<span class="keyword">int</span> _arg1;</span><br><span class="line">		_arg1 = data.readInt();</span><br><span class="line">		<span class="keyword">int</span> _result = <span class="keyword">this</span>.add(_arg0, _arg1);</span><br><span class="line">		reply.writeNoException();</span><br><span class="line">		reply.writeInt(_result);</span><br><span class="line">		<span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">	&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="keyword">super</span>.onTransact(code, data, reply, flags);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>&#160; &#160; &#160; &#160; 在Server进程里面，<code>onTransact</code>根据调用号（每个AIDL函数都有一个编号，在跨进程的时候，不会传递函数，而是传递编号指明调用哪个函数）调用相关函数；在这个例子里面，调用了Binder本地对象的<code>add</code>方法；这个方法将结果返回给驱动，驱动唤醒挂起的Client进程里面的线程并将结果返回。于是一次跨进程调用就完成了。</p>
+<p>&#160; &#160; &#160; &#160; 至此，你应该对AIDL这种通信方式里面的各个类以及各个角色有了一定的了解；它总是那么一种固定的模式：一个需要跨进程传递的对象一定继承自IBinder，如果是Binder本地对象，那么一定继承Binder实现IInterface，如果是代理对象，那么就实现了IInterface并持有了IBinder引用；</p>
+<p>&#160; &#160; &#160; &#160; Proxy与Stub不一样，虽然他们都既是Binder又是IInterface，不同的是Stub采用的是继承（is 关系），Proxy采用的是组合（has 关系）。他们均实现了所有的IInterface函数，不同的是，Stub又使用策略模式调用的是虚函数（待子类实现），而Proxy则使用组合模式。为什么Stub采用继承而Proxy采用组合？事实上，Stub本身is一个IBinder（Binder），它本身就是一个能跨越进程边界传输的对象，所以它得继承IBinder实现transact这个函数从而得到跨越进程的能力（这个能力由驱动赋予）。Proxy类使用组合，是因为他不关心自己是什么，它也不需要跨越进程传输，它只需要拥有这个能力即可，要拥有这个能力，只需要保留一个对IBinder的引用。如果把这个过程做一个类比，在封建社会，Stub好比皇帝，可以号令天下，他生而具有这个权利（不要说宣扬封建迷信。。）如果一个人也想号令天下，可以，“挟天子以令诸侯”。为什么不自己去当皇帝，其一，一般情况没必要，当了皇帝其实限制也蛮多的是不是？我现在既能掌管天下，又能不受约束（Java单继承）；其二，名不正言不顺啊，我本来特么就不是（Binder），你非要我是说不过去，搞不好还会造反。最后呢，如果想当皇帝也可以，那就是asBinder了。在Stub类里面，asBinder返回this，在Proxy里面返回的是持有的组合类IBinder的引用。</p>
+<p>&#160; &#160; &#160; &#160; 再去翻阅系统的ActivityManagerServer的源码，就知道哪一个类是什么角色了：IActivityManager是一个IInterface，它代表远程Service具有什么能力，ActivityManagerNative指的是Binder本地对象（类似AIDL工具生成的Stub类），这个类是抽象类，它的实现是ActivityManagerService；因此对于AMS的最终操作都会进入ActivityManagerService这个真正实现；同时如果仔细观察，ActivityManagerNative.java里面有一个非公开类ActivityManagerProxy, 它代表的就是Binder代理对象；是不是跟AIDL模型一模一样呢？那么ActivityManager是什么？他不过是一个管理类而已，可以看到真正的操作都是转发给ActivityManagerNative进而交给他的实现ActivityManagerService 完成的。</p>
+<h1 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h1><p>&#160; &#160; &#160; &#160; 至此分析Binder就告一段落了，也是一个越往下挖越恶心的东西。等以后有机会系统学一下Linux内核的知识。虽然兴趣是最好的老师，但是学习也是个循序渐进的过程，不可能一口吃成大胖子。知识的积累也是需要脚踏实地，一步一个脚印。量变引起质变，见多识广之后才能厚积薄发，逐渐形成自己的思维，使自己成长的更强大。同时，积累过程最忌浮躁，不可因外界环境干扰心境，要始终勿忘初心，心态保持平静，不随波逐流，上善若水。</p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2016/06/12/Binder简要分析/">Android跨进程通信机制Binder简要分析</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">windrunnerlihuan</a></p>
+        <p><span>发布时间:</span>2016-06-12, 00:24:24</p>
+        <p><span>最后更新:</span>2016-06-12, 08:40:22</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2016/06/12/Binder简要分析/" title="Android跨进程通信机制Binder简要分析">http://windrunnerlihuan.com/2016/06/12/Binder简要分析/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://windrunnerlihuan.com/2016/06/12/Binder简要分析/　　作者: windrunnerlihuan" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target = "_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2016/06/24/Android属性动画原理分析/">
+                    Android属性动画流程分析
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2016/06/06/移动直播技术秒开优化经验/">
+                    移动直播技术秒开优化经验
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#Binder通信模型"><span class="toc-number">1.</span> <span class="toc-text">Binder通信模型</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#Binder的优势"><span class="toc-number">1.1.</span> <span class="toc-text">Binder的优势</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#实现方式"><span class="toc-number">1.1.1.</span> <span class="toc-text">实现方式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#性能优化"><span class="toc-number">1.1.2.</span> <span class="toc-text">性能优化</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#安全性"><span class="toc-number">1.1.3.</span> <span class="toc-text">安全性</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#通信方式和引用"><span class="toc-number">1.2.</span> <span class="toc-text">通信方式和引用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Binder-通信模型"><span class="toc-number">1.3.</span> <span class="toc-text">Binder 通信模型</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Binder驱动"><span class="toc-number">1.3.1.</span> <span class="toc-text">Binder驱动</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#ServiceManager-与实名Binder"><span class="toc-number">1.3.2.</span> <span class="toc-text">ServiceManager 与实名Binder</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Client-获得实名Binder的引用"><span class="toc-number">1.3.3.</span> <span class="toc-text">Client 获得实名Binder的引用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#匿名-Binder"><span class="toc-number">1.3.4.</span> <span class="toc-text">匿名 Binder</span></a></li></ol></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#Binder机制跨进程原理"><span class="toc-number">2.</span> <span class="toc-text">Binder机制跨进程原理</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#Binder-在Server端的表述-–-Binder实体"><span class="toc-number">2.1.</span> <span class="toc-text">Binder 在Server端的表述 – Binder实体</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Binder-在Client端的表述-–-Binder引用"><span class="toc-number">2.2.</span> <span class="toc-text">Binder 在Client端的表述 – Binder引用</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#分析Java层的Binder"><span class="toc-number">3.</span> <span class="toc-text">分析Java层的Binder</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#AIDL过程分析"><span class="toc-number">3.1.</span> <span class="toc-text">AIDL过程分析</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#结语"><span class="toc-number">4.</span> <span class="toc-text">结语</span></a></li></ol>
+</div>
+<style>
+    .left-col .switch-btn {
+        display: none;
+    }
+    .left-col .switch-area {
+        display: none;
+    }
+</style>
+
+<input type="button" id="tocButton" value="隐藏目录"  title="点击按钮隐藏或者显示文章目录">
+<script>
+    var valueHide = "隐藏目录";
+    var valueShow = "显示目录";
+
+    if ($(".left-col").is(":hidden")) {
+        $("#tocButton").attr("value", valueShow);
+    }
+
+    $("#tocButton").click(function() {
+        if ($("#toc").is(":hidden")) {
+            $("#tocButton").attr("value", valueHide);
+            $("#toc").slideDown(320);
+            $(".switch-btn, .switch-area").fadeOut(300);
+        }
+        else {
+            $("#tocButton").attr("value", valueShow);
+            $("#toc").slideUp(350);
+            $(".switch-btn, .switch-area").fadeIn(500);
+        }
+    })
+
+    if ($(".toc").length < 1) {
+        $("#toc, #tocButton").hide();
+        $(".switch-btn, .switch-area").show();
+    }
+</script>
+
+
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></i></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"Android跨进程通信机制Binder简要分析　| April is your lie　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+      <div class="duoshuo" id="comments">
+    <!-- ��˵���ۿ� start -->
+    <div class="ds-thread" data-thread-key="2016/06/12/Binder简要分析/" data-title="Android跨进程通信机制Binder简要分析" data-url="http://windrunnerlihuan.com/2016/06/12/Binder简要分析/"></div>
+    <!-- ��˵���ۿ� end -->
+    <!-- ��˵����JS���� start (һ����ҳֻ������һ��) -->
+    <script type="text/javascript">
+    var duoshuoQuery = {short_name:"windrunnerlihuan"};
+    (function() {
+        var ds = document.createElement('script');
+        ds.type = 'text/javascript';ds.async = true;
+        ds.src = 'http://windrunnerlihuan.com/js/embed.js';
+        ds.charset = 'UTF-8';
+        (document.getElementsByTagName('head')[0] 
+         || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+    </script>
+    <!-- ��˵����JS���� end -->
+</div>
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2016/06/24/Android属性动画原理分析/" title="上一篇: Android属性动画流程分析">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2016/06/06/移动直播技术秒开优化经验/" title="下一篇: 移动直播技术秒开优化经验">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2016/09/05/插件开发中的资源问题分析及填坑处理/">插件开发中的资源问题分析及填坑处理</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/08/23/智能指针简单分析/">智能指针简单分析</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/31/Android消息机制零散分析/">Android消息处理零散分析</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/12/浅析Bitmap占据内存大小/">浅析Bitmap占据内存大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/07/02/DanmakuFlameMaster简单分析/">弹幕框架DanmakuFlameMaster简单分析</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/24/Android属性动画原理分析/">Android属性动画流程分析</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/12/Binder简要分析/">Android跨进程通信机制Binder简要分析</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/06/06/移动直播技术秒开优化经验/">移动直播技术秒开优化经验</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/05/27/博客搭建历程/">博客搭建历程————————Github和Hexo</a></li><li class="post-list-item"><a class="post-list-link" href="/2016/05/27/新的开始/">新的开始</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2016 windrunnerlihuan
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.0">Yelee</a> by HuanLi & MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style='display:none'>
+                        <span id="site-visit" >本站到访数: 
+                            <span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>, </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style='display:none'>
+                        <span id="page-visit">本页阅读量: 
+                            <span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+    <script src="/js/GithubRepoWidget.js"></script>
+
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+
+
+
+    <script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"]  ],
+        processEscapes: true,
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+    }
+});
+
+MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+        all[i].SourceElement().parentNode.className += ' has-jax';                 
+    }       
+});
+</script>
+
+<script src="//cdn.bootcss.com/mathjax/2.6.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>
